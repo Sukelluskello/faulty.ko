@@ -1,10 +1,10 @@
-= Linux Kernel module with faults =
+# Linux Kernel module with faults
 
 This is a toy Linux Kernel module, with intentional (and perhaps
 unintentional) coding faults. It is used as an illustration for errors
 caused by different types of programming errors.
 
-== Usage
+## Usage
 
 Make sure you have installed kernel headers or sources. Then compile the
 module with
@@ -13,10 +13,10 @@ module with
 
 *TODO*: installation, loading, examples of faults
 
-== Author
+## Author
 
 Ilja Sidoroff (-at) iki.fi
 
-== License
+## License
 
 GNU GPLv2
