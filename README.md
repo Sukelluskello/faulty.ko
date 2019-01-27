@@ -26,11 +26,26 @@ message saying something about _kernel lockdown_, you can either
 disable Secure Boot in BIOS (easy) or sign the compiled module (not so
 easy).
 
-You can unload the module with
+You can unload the module with (if playing with bugs hasn't made your
+kernel unstable/locked)
 
     $ sudo rmmod faulty
 
-*TODO*: examples of faults
+The module exposes endpoints in `debugfs` (usually mounted in
+`/sys/kernel/debugfs`), which can be used to trigger faults. This
+might crash or lock your kernel, so using a virtual machine might be a
+good idea.
+
+You can usually read from or write to these endpoints using e.g.
+
+    # cat /sys/kernel/debugs/faulty/sbo
+	# echo -n "123" > /sys/kernel/debugfs/faulty/sbo
+	
+(accessing `debugfs` is easiest as root) 
+
+Exposed endpoints
+
+  * `faulty/sbo` (r/w): a stack buffer overflow
 
 ## Author
 
