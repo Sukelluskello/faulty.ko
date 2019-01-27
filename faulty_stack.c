@@ -10,10 +10,9 @@ static ssize_t sbo_read(struct file *fps, char *buf, size_t len, loff_t *offset)
 static ssize_t sbo_write(struct file *fps, const char *buf, size_t len, loff_t *offset);
 void non_reachable_function(void);
 
-static char *buffer = "just some small data buffer";
+static char *buffer = "just some small data buffer\n";
 
-struct dentry *fil;
-int value;
+// TODO perhaps allocate some memory here to avoid clobbering fobs_sbo
 
 static const struct file_operations fops_sbo = {
 	.owner = THIS_MODULE,
@@ -24,7 +23,7 @@ static const struct file_operations fops_sbo = {
 
 int init_stack_buffer_overflow(struct dentry *dir, const char *fn)
 {
-	fil = debugfs_create_file(fn, 0644, dir, &value, &fops_sbo);
+	fil = debugfs_create_file(fn, 0644, dir, NULL, &fops_sbo);
 	if (fil == NULL) {
 		pr_err("Faulty: Cannot create endpoint %s\n", fn);
 		return -ENOENT;
@@ -38,31 +37,23 @@ static ssize_t sbo_read(struct file *fps, char *buf, size_t len,
 {
 	return simple_read_from_buffer(buf, len, offset, buffer,
 				       strlen(buffer));
-
 }
 
 static ssize_t sbo_write(struct file *fps, const char *buf, size_t len,
 			 loff_t *offset)
 {
-	int kbuf_size = 30;
+	int kbuf_size = 10;
 	int flag = 0; // variable to clobber
 	char kbuf[kbuf_size];
-	char *kbuf_ptr = kbuf;
-	char *pos = buffer;
 	int bytes_written = 0;
 
-	// Fault 1: length of the incoming data is used instead of
-	// target buffer length
+	// Fault-SBO: length of the incoming data is used instead of
+	// target buffer length (kbuf_size)
 	bytes_written = simple_write_to_buffer(kbuf, len, offset,
 					       buf, len);
 
-	if (strlen(buffer) != bytes_written)
-		return -EINVAL;
-
-	while (*pos) {
-		if (*pos++ != *kbuf_ptr++)
-			return -EINVAL;
-	}
+	// TODO: another fault here?
+	//strncpy(buffer, kbuf, len);
 
 	// we'll bypass stack canary evasion at this time
 	if (flag != 0) {
