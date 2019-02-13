@@ -2,6 +2,7 @@
  * A kernel module with intentional (and unintentional?) bugs
  */
 
+#include "faulty_slab.h"
 #include "faulty_stack.h"
 
 #include <linux/module.h>
@@ -35,6 +36,9 @@ static int __init mod_init(void)
 	else
 		pr_err
 		    ("Faulty: Cannot create debugfs-entry faulty/sbo\n");
+
+	if (!init_slab_corruption(dir, "slab"))
+	    pr_err("Faulty: Cannot create debugfs-entry faulty/slab\n");
 
 	pr_debug("Faulty: module loaded\n");
 	return 0;
