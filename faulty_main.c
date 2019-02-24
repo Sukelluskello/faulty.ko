@@ -38,6 +38,8 @@ static int __init mod_init(void)
 		    ("Faulty: Cannot create debugfs-entry faulty/sbo\n");
 
 	if (!init_slab_corruption(dir, "slab"))
+	    pr_debug("Faulty: Slab buffer overflow at debugfs 'faulty/slab'\n");
+	else
 	    pr_err("Faulty: Cannot create debugfs-entry faulty/slab\n");
 
 	pr_debug("Faulty: module loaded\n");

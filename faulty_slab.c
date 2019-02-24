@@ -18,7 +18,15 @@ static const struct file_operations fops_slab = {
 	.write = slab_write,
 };
 
-// TODO: perhaps abstract
+
+struct node {
+    char data[10];
+    bool flag;
+    struct list_head list;
+};
+
+struct node *nodes = NULL;
+
 int init_slab_corruption(struct dentry *dir, const char *fn)
 {
 	fil_slab = debugfs_create_file(fn, 0644, dir, NULL, &fops_slab);
@@ -28,21 +36,30 @@ int init_slab_corruption(struct dentry *dir, const char *fn)
 	}
 
 	return 0;
+	
 }
 
 static ssize_t slab_read(struct file *fps, char *buf, size_t len,
 			loff_t *offset)
 {
-    return 0; // TODO implement me
+    if (nodes) {
+    }
+    else
+	return 0;
+
+    return 0;
 }
 
 static ssize_t slab_write(struct file *fps, const char *buf, size_t len,
 			 loff_t *offset)
 {
+    if (!nodes) {
+	// init list
+    }
     return 0; // TODO implement me
 }
 
 void slab_non_reachable_function(void)
 {
-
+    pr_info("This function should not be reachable.\n");
 }
