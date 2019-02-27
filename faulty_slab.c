@@ -9,7 +9,8 @@ struct dentry *fil_slab;
 
 static ssize_t slab_read(struct file *fps, char *buf, size_t len, loff_t *offset);
 static ssize_t slab_write(struct file *fps, const char *buf, size_t len, loff_t *offset);
-void non_reachable_function(void);
+void operate_with_other_data(void);
+void slab_non_reachable_function(void);
 
 static const struct file_operations fops_slab = {
 	.owner = THIS_MODULE,
@@ -18,15 +19,14 @@ static const struct file_operations fops_slab = {
 	.write = slab_write,
 };
 
-struct user_controlled_data {
+struct some_data {
     char data[10];
-    bool flag;
-} *user_controlled = NULL;
+    bool flag_which_is_never_set;
+};
 
-struct unrelated_data {
-    char data[10];
-} *unrelated = NULL;
-
+struct some_data *user_controlled = NULL;
+struct some_data *other_data = NULL;
+bool toggle = false;
 
 int init_slab_corruption(struct dentry *dir, const char *fn)
 {
@@ -43,6 +43,8 @@ int init_slab_corruption(struct dentry *dir, const char *fn)
 static ssize_t slab_read(struct file *fps, char *buf, size_t len,
 			loff_t *offset)
 {
+    operate_with_other_data();
+    
     if (!user_controlled) {
 	pr_debug("Faulty: Slab - Read, no data\n");
 	return 0;
@@ -57,20 +59,39 @@ static ssize_t slab_read(struct file *fps, char *buf, size_t len,
 static ssize_t slab_write(struct file *fps, const char *buf, size_t len,
 			 loff_t *offset)
 {
-    // TODO: should have also try to have double free here
+    operate_with_other_data();
+
     if (!user_controlled) {
 	pr_debug("Faulty: Slab - Write, No data\n");
     } else {
 	pr_debug("Faulty: Slab - Write, Free old data\n");
 	kfree(user_controlled);
     }
-    user_controlled = kmalloc(sizeof (struct user_controlled_data), GFP_KERNEL);
+    user_controlled = kmalloc(sizeof (struct some_data), GFP_KERNEL);
+
+    // TODO test conditions
+    if (other_data->flag_which_is_never_set)
+	slab_non_reachable_function();
+    
     return simple_write_to_buffer(user_controlled->data, len, offset,
 				  buf, len);
 
 }
 
+// TODO: make this double freeable
+void operate_with_other_data() {
+    if (!toggle) {
+	toggle = true;
+	pr_debug("Faulty: Slab - allocating other data");
+	other_data = kzalloc(sizeof (struct some_data), GFP_KERNEL);
+    } else {
+	pr_debug("Faulty: Slab - freeing other data");
+	kfree(other_data);
+	toggle = false;
+    }
+}
+    
 void slab_non_reachable_function(void)
 {
-    pr_info("This function should not be reachable.\n");
+    pr_info("Faulty: Slab - This function should not be reachable.\n");
 }
