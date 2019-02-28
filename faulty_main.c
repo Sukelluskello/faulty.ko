@@ -2,8 +2,11 @@
  * A kernel module with intentional (and unintentional?) bugs
  */
 
+#include "faulty_format.h"
+#include "faulty_race.h"
 #include "faulty_slab.h"
 #include "faulty_stack.h"
+#include "faulty_xflow.h"
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -12,11 +15,13 @@
 
 struct dentry *dir;
 
+const char *root = "ffaulty";
+
 static int __init mod_init(void)
 {
 	pr_debug("Faulty: creating debugfs-endpoints\n");
 
-	dir = debugfs_create_dir("faulty", NULL);
+	dir = debugfs_create_dir(root, NULL);
 
 	if (dir == ERR_PTR(-ENODEV)) {
 		pr_err
@@ -26,21 +31,36 @@ static int __init mod_init(void)
 
 	if (dir == NULL) {
 		pr_err
-		    ("Faulty: Cannot create debugfs-entry 'faulty'");
+		    ("Faulty: Cannot create debugfs-entry '%s'", root);
 		return -ENOENT;
 	}
 	// Create endpoints for potential vulnerabilities
 	if (!init_stack_buffer_overflow(dir, "sbo"))
 		pr_debug
-		    ("Faulty: Stack buffer overflow at debugfs 'faulty/sbo'\n");
+		    ("Faulty: Stack buffer overflow at debugfs '%s/sbo'\n", root);
 	else
 		pr_err
-		    ("Faulty: Cannot create debugfs-entry faulty/sbo\n");
+		    ("Faulty: Cannot create debugfs-entry %s/sbo\n", root);
 
 	if (!init_slab_corruption(dir, "slab"))
-	    pr_debug("Faulty: Slab buffer overflow at debugfs 'faulty/slab'\n");
+	    pr_debug("Faulty: Slab buffer overflow at debugfs '%s/slab'\n", root);
 	else
-	    pr_err("Faulty: Cannot create debugfs-entry faulty/slab\n");
+	    pr_err("Faulty: Cannot create debugfs-entry %s/slab\n", root);
+
+	if (!init_data_race(dir, "data-race"))
+	    pr_debug("Faulty: Data race at debugfs '%s/data-race'\n", root);
+	else
+	    pr_err("Faulty: Cannot create debugfs-entry %s/data-race\n", root);
+	
+	if (!init_xflow(dir, "xflow"))
+	    pr_debug("Faulty: Integer under/overflow at debugfs '%s/xflow'\n", root);
+	else
+	    pr_err("Faulty: Cannot create debugfs-entry %s/xflow\n", root);
+
+	if (!init_format(dir, "format"))
+	    pr_debug("Faulty: Format string bug at debugfs '%s/format'\n", root);
+	else
+	    pr_err("Faulty: Cannot create debugfs-entry %s/format\n", root);
 
 	pr_debug("Faulty: module loaded\n");
 	return 0;
