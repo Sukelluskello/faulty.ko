@@ -5,7 +5,7 @@
 #include <linux/fs.h>
 #include <linux/slab.h>
 
-struct dentry *fil_slab;
+static struct dentry *fil;
 
 static ssize_t slab_read(struct file *fps, char *buf, size_t len, loff_t *offset);
 static ssize_t slab_write(struct file *fps, const char *buf, size_t len, loff_t *offset);
@@ -30,17 +30,16 @@ bool toggle = false;
 
 int init_slab_corruption(struct dentry *dir, const char *fn)
 {
-	fil_slab = debugfs_create_file(fn, 0644, dir, NULL, &fops_slab);
-	if (fil_slab == NULL) {
+	fil = debugfs_create_file(fn, 0644, dir, NULL, &fops_slab);
+	if (fil == NULL) {
 		pr_err("Faulty: Cannot create endpoint %s\n", fn);
 		return -ENOENT;
 	}
 
 	return 0;
-	
 }
 
-static ssize_t slab_read(struct file *fps, char *buf, size_t len,
+static ssize_t slab_read(struct file *fps, char __user *buf, size_t len,
 			loff_t *offset)
 {
     operate_with_other_data();
@@ -56,7 +55,7 @@ static ssize_t slab_read(struct file *fps, char *buf, size_t len,
 
 }
 
-static ssize_t slab_write(struct file *fps, const char *buf, size_t len,
+static ssize_t slab_write(struct file *fps, const char __user *buf, size_t len,
 			 loff_t *offset)
 {
     operate_with_other_data();

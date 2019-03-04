@@ -4,7 +4,7 @@
 #include <linux/debugfs.h>
 #include <linux/fs.h>
 
-struct dentry *fil;
+static struct dentry *fil;
 
 static ssize_t sbo_read(struct file *fps, char *buf, size_t len, loff_t *offset);
 static ssize_t sbo_write(struct file *fps, const char *buf, size_t len, loff_t *offset);
@@ -32,14 +32,14 @@ int init_stack_buffer_overflow(struct dentry *dir, const char *fn)
 	return 0;
 }
 
-static ssize_t sbo_read(struct file *fps, char *buf, size_t len,
+static ssize_t sbo_read(struct file *fps, char __user *buf, size_t len,
 			loff_t *offset)
 {
 	return simple_read_from_buffer(buf, len, offset, buffer,
 				       strlen(buffer));
 }
 
-static ssize_t sbo_write(struct file *fps, const char *buf, size_t len,
+static ssize_t sbo_write(struct file *fps, const char __user *buf, size_t len,
 			 loff_t *offset)
 {
 	int kbuf_size = 10;
