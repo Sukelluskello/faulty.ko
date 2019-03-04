@@ -6,7 +6,7 @@
 #include "faulty_race.h"
 #include "faulty_slab.h"
 #include "faulty_stack.h"
-#include "faulty_xflow.h"
+#include "faulty_overflow.h"
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -52,10 +52,10 @@ static int __init mod_init(void)
 	else
 	    pr_err("Faulty: Cannot create debugfs-entry %s/data-race\n", root);
 	
-	if (!init_xflow(dir, "xflow"))
-	    pr_debug("Faulty: Integer under/overflow at debugfs '%s/xflow'\n", root);
+	if (!init_overflow(dir, "overflow"))
+	    pr_debug("Faulty: Integer under/overflow at debugfs '%s/overflow'\n", root);
 	else
-	    pr_err("Faulty: Cannot create debugfs-entry %s/xflow\n", root);
+	    pr_err("Faulty: Cannot create debugfs-entry %s/overflow\n", root);
 
 	if (!init_format(dir, "format"))
 	    pr_debug("Faulty: Format string bug at debugfs '%s/format'\n", root);

@@ -1,6 +1,6 @@
 ifneq ($(KERNELRELEASE),)
 obj-m += faulty.o
-faulty-y := faulty_main.o faulty_stack.o faulty_slab.o faulty_race.o faulty_xflow.o faulty_format.o
+faulty-y := faulty_main.o faulty_stack.o faulty_slab.o faulty_race.o faulty_overflow.o faulty_format.o
 
 ccflags-y := -DDEBUG -Wall
 
