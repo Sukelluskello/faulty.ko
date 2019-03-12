@@ -1,11 +1,14 @@
 /*
  * Faulty: A kernel module with intentional (and unintentional?) bugs
  */
-#include <linux/module.h>
-#include <linux/kernel.h>
 #include <linux/debugfs.h>
+#include <linux/delay.h>
 #include <linux/fs.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/slab.h>
+
+#include "faulty_race.h"
 
 #define BUF_SIZE 256
 
@@ -22,7 +25,12 @@ static ssize_t unsigned_overflow_read(struct file *fps, char *buf, size_t len, l
 static ssize_t signed_underflow_read(struct file *fps, char *buf, size_t len, loff_t *offset);
 static ssize_t format_read(struct file *fps, char *buf, size_t len, loff_t *offset);
 static ssize_t format_write(struct file *fps, const char *buf, size_t len, loff_t *offset);
+static ssize_t race_read(struct file *fps, char *buf, size_t len, loff_t *offset);
+static ssize_t race_write(struct file *fps, const char *buf, size_t len, loff_t *offset);
 static void non_reachable_function(void);
+
+// TODO
+// - double free
 
 // stack buffer overflow
 static char *buffer = "just some small data buffer\n";
@@ -77,6 +85,17 @@ static const struct file_operations fops_format = {
 	.write = format_write,
 };
 
+// data race
+static char *race1;
+static char *race2;
+
+static const struct file_operations fops_race = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.read = race_read,
+	.write = race_write,
+};
+
 static int __init mod_init(void)
 {
 	pr_debug("Faulty: creating debugfs-endpoints\n");
@@ -103,30 +122,43 @@ static int __init mod_init(void)
 		    ("Faulty: Cannot create debugfs-entry %s/sbo\n", root);
 
 	if (!init_endpoint(dir, "slab", &fops_slab))
-	    pr_debug("Faulty: Slab buffer overflow at debugfs '%s/slab'\n", root);
+		pr_debug("Faulty: Slab buffer overflow at debugfs '%s/slab'\n", root);
 	else
-	    pr_err("Faulty: Cannot create debugfs-entry %s/slab\n", root);
-
-	if (!init_endpoint(dir, "data-race", NULL)) // TODO implement me
-	    pr_debug("Faulty: Data race at debugfs '%s/data-race'\n", root);
-	else
-	    pr_err("Faulty: Cannot create debugfs-entry %s/data-race\n", root);
+		pr_err("Faulty: Cannot create debugfs-entry %s/slab\n", root);
 
 	if (!init_endpoint(dir, "overflow", &fops_overflow))
-	    pr_debug("Faulty: Unsigned integer overflow at debugfs '%s/overflow'\n", root);
+		pr_debug("Faulty: Unsigned integer overflow at debugfs '%s/overflow'\n", root);
 	else
-	    pr_err("Faulty: Cannot create debugfs-entry %s/overflow\n", root);
+		pr_err("Faulty: Cannot create debugfs-entry %s/overflow\n", root);
 
 	if (!init_endpoint(dir, "underflow", &fops_underflow))
-	    pr_debug("Faulty: Signed integer underflow at debugfs '%s/underflow'\n", root);
+		pr_debug("Faulty: Signed integer underflow at debugfs '%s/underflow'\n", root);
 	else
-	    pr_err("Faulty: Cannot create debugfs-entry %s/underflow\n", root);
+		pr_err("Faulty: Cannot create debugfs-entry %s/underflow\n", root);
 
 	if (!init_endpoint(dir, "format", &fops_format))
-	    pr_debug("Faulty: Format string bug at debugfs '%s/format'\n", root);
+		pr_debug("Faulty: Format string bug at debugfs '%s/format'\n", root);
 	else
-	    pr_err("Faulty: Cannot create debugfs-entry %s/format\n", root);
+		pr_err("Faulty: Cannot create debugfs-entry %s/format\n", root);
 
+	if (!init_endpoint(dir, "data-race", &fops_race)) {
+		race1 = kzalloc(PAGE_SIZE, GFP_KERNEL);
+		if (!race1) {
+			pr_debug("Faulty: Race - cannot allocate buffer 1\n");
+			goto end;
+		}
+		race2 = kzalloc(PAGE_SIZE, GFP_KERNEL);
+		if (!race2) {
+			pr_debug("Faulty: Race - cannot allocate buffer 2\n");
+			kfree(race1);
+			goto end;
+		}
+		pr_debug("Faulty: Format string bug at debugfs '%s/data-race'\n", root);
+	}
+	else
+		pr_err("Faulty: Cannot create debugfs-entry %s/data-race\n", root);
+
+end:
 	pr_debug("Faulty: module loaded\n");
 	return 0;
 
@@ -135,6 +167,9 @@ static int __init mod_init(void)
 static void __exit mod_exit(void)
 {
 	debugfs_remove_recursive(dir);
+	kfree(race1);
+	kfree(race2);
+
 	pr_debug("Faulty: Unloaded faulty kernel module\n");
 }
 
@@ -165,7 +200,8 @@ static ssize_t sbo_write(struct file *fps, const char __user *buf, size_t len,
 	char kbuf[kbuf_size];
 	int bytes_written = 0;
 
-	// Fault-SBO: length of the incoming data is used instead of
+	// FAULT: stack buffer overflow
+	// length of the incoming data is used instead of
 	// target buffer length (kbuf_size)
 	bytes_written = simple_write_to_buffer(kbuf, len, offset,
 					       buf, len);
@@ -215,6 +251,7 @@ static ssize_t slab_write(struct file *fps, const char __user *buf, size_t len,
 	if (other_data->flag_which_is_never_set)
 		non_reachable_function();
 
+	// FAULT: heap buffer overflow
 	return simple_write_to_buffer(user_controlled->data, len, offset,
 				buf, len);
 
@@ -240,6 +277,7 @@ static ssize_t unsigned_overflow_read(struct file *fps, char __user *buf, size_t
 	char *buffer = kmalloc(BUF_SIZE, GFP_KERNEL);
 	ssize_t n = 0;
 
+	// FAULT: unsigned overflow
 	snprintf(buffer, BUF_SIZE, "Faulty: Overflow - Counter value :%d\n",
 		unsigned_counter++); // note the behaviour of counter
 
@@ -258,6 +296,7 @@ static ssize_t signed_underflow_read(struct file *fps, char __user *buf, size_t 
 	char *buffer = kmalloc(BUF_SIZE, GFP_KERNEL);
 	ssize_t n = 0;
 
+	// FAULT: signed underflow
 	snprintf(buffer, BUF_SIZE, "Faulty: Underflow - Counter value :%d\n",
 		signed_counter--); // note the behaviour of counter
 
@@ -287,7 +326,37 @@ static ssize_t format_write(struct file *fps, const char __user *buf, size_t len
 	buffer[n] = '\0';
 	pr_info("Faulty: %s\n", buffer);
 	// pr_info(buffer); // this would generate a compile-time error
-	printk(buffer); // vulnerable
+	// FAULT: format-string
+	printk(buffer);
+	return n;
+}
+
+static ssize_t race_read(struct file *fps, char __user *buf, size_t len,
+			loff_t *offset)
+{
+	if (strcmp(race1, race2)) {
+		non_reachable_function();
+	}
+	return simple_read_from_buffer(buf, len, offset, race1,
+				strlen(race1));
+}
+
+static ssize_t race_write(struct file *fps, const char __user *buf, size_t len,
+			 loff_t *offset)
+{
+	// FAULT: stack overflow
+	char buffer[PAGE_SIZE]; // TODO use variable length array
+	ssize_t n;
+
+	n = simple_write_to_buffer(&buffer, PAGE_SIZE, offset, buf, len);
+	buffer[n] = '\0';
+
+	// FAULT: race
+	// slow write is racy
+	memcpy(race1, buffer, len);
+	udelay(100);
+	memcpy(race2, buffer, len);
+
 	return n;
 }
 
