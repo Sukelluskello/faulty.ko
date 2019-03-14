@@ -132,29 +132,18 @@ static int __init mod_init(void)
 	if (!init_endpoint(dir, "sbo", &fops_sbo))
 		pr_debug
 		    ("Faulty: Stack buffer overflow at debugfs '%s/sbo'\n", root);
-	else
-		pr_err
-		    ("Faulty: Cannot create debugfs-entry %s/sbo\n", root);
 
 	if (!init_endpoint(dir, "slab", &fops_slab))
 		pr_debug("Faulty: Slab buffer overflow at debugfs '%s/slab'\n", root);
-	else
-		pr_err("Faulty: Cannot create debugfs-entry %s/slab\n", root);
 
 	if (!init_endpoint(dir, "overflow", &fops_overflow))
 		pr_debug("Faulty: Unsigned integer overflow at debugfs '%s/overflow'\n", root);
-	else
-		pr_err("Faulty: Cannot create debugfs-entry %s/overflow\n", root);
 
 	if (!init_endpoint(dir, "underflow", &fops_underflow))
 		pr_debug("Faulty: Signed integer underflow at debugfs '%s/underflow'\n", root);
-	else
-		pr_err("Faulty: Cannot create debugfs-entry %s/underflow\n", root);
 
 	if (!init_endpoint(dir, "format", &fops_format))
 		pr_debug("Faulty: Format string bug at debugfs '%s/format'\n", root);
-	else
-		pr_err("Faulty: Cannot create debugfs-entry %s/format\n", root);
 
 	if (!init_endpoint(dir, "data-race", &fops_race)) {
 		race1 = kzalloc(PAGE_SIZE, GFP_KERNEL);
@@ -170,18 +159,12 @@ static int __init mod_init(void)
 		}
 		pr_debug("Faulty: Format string bug at debugfs '%s/data-race'\n", root);
 	}
-	else
-		pr_err("Faulty: Cannot create debugfs-entry %s/data-race\n", root);
 
 	if (!init_endpoint(dir, "double-free", &fops_double_free))
 		pr_debug("Faulty: Double free bug at debugfs '%s/double-free'\n", root);
-	else
-		pr_err("Faulty: Cannot create debugfs-entry %s/double-free\n", root);
 
 	if (!init_endpoint(dir, "use-after-free", &fops_use_after_free))
 		pr_debug("Faulty: Double free bug at debugfs '%s/use-after-free'\n", root);
-	else
-		pr_err("Faulty: Cannot create debugfs-entry %s/use-after-free\n", root);
 
 
 end:
