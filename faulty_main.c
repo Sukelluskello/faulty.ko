@@ -8,8 +8,6 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 
-#include "faulty_race.h"
-
 #define BUF_SIZE 256
 
 struct dentry *dir;
@@ -27,10 +25,10 @@ static ssize_t format_read(struct file *fps, char *buf, size_t len, loff_t *offs
 static ssize_t format_write(struct file *fps, const char *buf, size_t len, loff_t *offset);
 static ssize_t race_read(struct file *fps, char *buf, size_t len, loff_t *offset);
 static ssize_t race_write(struct file *fps, const char *buf, size_t len, loff_t *offset);
+static ssize_t df_alloc(struct file *fps, char *buf, size_t len, loff_t *offset);
+static ssize_t df_free(struct file *fps, const char *buf, size_t len, loff_t *offset);
+static ssize_t use_after_free_read(struct file *fps, char *buf, size_t len, loff_t *offset);
 static void non_reachable_function(void);
-
-// TODO
-// - double free
 
 // stack buffer overflow
 static char *buffer = "just some small data buffer\n";
@@ -96,6 +94,23 @@ static const struct file_operations fops_race = {
 	.write = race_write,
 };
 
+// double free
+static char *double_free;
+
+static const struct file_operations fops_double_free = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.read = df_alloc,
+	.write = df_free,
+};
+
+// use after free
+static const struct file_operations fops_use_after_free = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.read = use_after_free_read,
+};
+
 static int __init mod_init(void)
 {
 	pr_debug("Faulty: creating debugfs-endpoints\n");
@@ -157,6 +172,17 @@ static int __init mod_init(void)
 	}
 	else
 		pr_err("Faulty: Cannot create debugfs-entry %s/data-race\n", root);
+
+	if (!init_endpoint(dir, "double-free", &fops_double_free))
+		pr_debug("Faulty: Double free bug at debugfs '%s/double-free'\n", root);
+	else
+		pr_err("Faulty: Cannot create debugfs-entry %s/double-free\n", root);
+
+	if (!init_endpoint(dir, "use-after-free", &fops_use_after_free))
+		pr_debug("Faulty: Double free bug at debugfs '%s/use-after-free'\n", root);
+	else
+		pr_err("Faulty: Cannot create debugfs-entry %s/use-after-free\n", root);
+
 
 end:
 	pr_debug("Faulty: module loaded\n");
@@ -345,7 +371,7 @@ static ssize_t race_write(struct file *fps, const char __user *buf, size_t len,
 			 loff_t *offset)
 {
 	// FAULT: stack overflow
-	char buffer[PAGE_SIZE]; // TODO use variable length array
+	char buffer[PAGE_SIZE];
 	ssize_t n;
 
 	n = simple_write_to_buffer(&buffer, PAGE_SIZE, offset, buf, len);
@@ -359,6 +385,29 @@ static ssize_t race_write(struct file *fps, const char __user *buf, size_t len,
 
 	return n;
 }
+
+static ssize_t df_alloc(struct file *fps, char *buf, size_t len, loff_t *offset)
+{
+	double_free = kmalloc(len, GFP_KERNEL);
+	return len;
+}
+static ssize_t df_free(struct file *fps, const char *buf, size_t len, loff_t *offset)
+{
+	// Fault: double free
+	kfree(double_free);
+	return len;
+}
+
+static ssize_t use_after_free_read(struct file *fps, char *buf, size_t len, loff_t *offset)
+{
+	char *tmp = kmalloc(len, GFP_KERNEL);
+	strncpy(tmp, buffer, len);
+	// Fault: use after free
+	kfree(tmp);
+	strncpy(buf, tmp, len);
+	return len;
+}
+
 
 static void non_reachable_function(void)
 {
