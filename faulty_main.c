@@ -376,7 +376,7 @@ static ssize_t df_alloc(struct file *fps, char *buf, size_t len, loff_t *offset)
 }
 static ssize_t df_free(struct file *fps, const char *buf, size_t len, loff_t *offset)
 {
-	// Fault: double free
+	// FAULT: double free
 	kfree(double_free);
 	return len;
 }
@@ -385,7 +385,7 @@ static ssize_t use_after_free_read(struct file *fps, char *buf, size_t len, loff
 {
 	char *tmp = kmalloc(len, GFP_KERNEL);
 	strncpy(tmp, buffer, len);
-	// Fault: use after free
+	// FAULT: use after free
 	kfree(tmp);
 	strncpy(buf, tmp, len);
 	return len;
