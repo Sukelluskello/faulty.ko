@@ -1,33 +1,35 @@
 /*
  * Faulty: A kernel module with intentional (and unintentional?) bugs
  */
+
 #include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/uaccess.h>
 #include <linux/slab.h>
 
 #define BUF_SIZE 256
 
-struct dentry *dir;
-const char *root = "ffaulty";
+static struct dentry *dir;
+static const char *root = "ffaulty";
 
 static int init_endpoint(struct dentry *dir, const char *fn, const struct file_operations *fops);
-static ssize_t sbo_read(struct file *fps, char *buf, size_t len, loff_t *offset);
-static ssize_t sbo_write(struct file *fps, const char *buf, size_t len, loff_t *offset);
-static ssize_t slab_read(struct file *fps, char *buf, size_t len, loff_t *offset);
-static ssize_t slab_write(struct file *fps, const char *buf, size_t len, loff_t *offset);
+static ssize_t sbo_read(struct file *fps, __user char *buf, size_t len, loff_t *offset);
+static ssize_t sbo_write(struct file *fps, const char __user *buf, size_t len, loff_t *offset);
+static ssize_t slab_read(struct file *fps, char __user *buf, size_t len, loff_t *offset);
+static ssize_t slab_write(struct file *fps, const char __user *buf, size_t len, loff_t *offset);
 static void slab_operate_with_other_data(void);
-static ssize_t unsigned_overflow_read(struct file *fps, char *buf, size_t len, loff_t *offset);
-static ssize_t signed_underflow_read(struct file *fps, char *buf, size_t len, loff_t *offset);
-static ssize_t format_read(struct file *fps, char *buf, size_t len, loff_t *offset);
-static ssize_t format_write(struct file *fps, const char *buf, size_t len, loff_t *offset);
-static ssize_t race_read(struct file *fps, char *buf, size_t len, loff_t *offset);
-static ssize_t race_write(struct file *fps, const char *buf, size_t len, loff_t *offset);
-static ssize_t df_alloc(struct file *fps, char *buf, size_t len, loff_t *offset);
-static ssize_t df_free(struct file *fps, const char *buf, size_t len, loff_t *offset);
-static ssize_t use_after_free_read(struct file *fps, char *buf, size_t len, loff_t *offset);
+static ssize_t unsigned_overflow_read(struct file *fps, char __user *buf, size_t len, loff_t *offset);
+static ssize_t signed_underflow_read(struct file *fps, char __user *buf, size_t len, loff_t *offset);
+static ssize_t format_read(struct file *fps, char __user *buf, size_t len, loff_t *offset);
+static ssize_t format_write(struct file *fps, const char __user *buf, size_t len, loff_t *offset);
+static ssize_t race_read(struct file *fps, char __user *buf, size_t len, loff_t *offset);
+static ssize_t race_write(struct file *fps, const char __user *buf, size_t len, loff_t *offset);
+static ssize_t df_alloc(struct file *fps, char __user *buf, size_t len, loff_t *offset);
+static ssize_t df_free(struct file *fps, const char __user *buf, size_t len, loff_t *offset);
+static ssize_t use_after_free_read(struct file *fps, char __user *buf, size_t len, loff_t *offset);
 static void non_reachable_function(void);
 
 // stack buffer overflow
@@ -53,9 +55,9 @@ struct some_data {
 	bool flag_which_is_never_set;
 };
 
-struct some_data *user_controlled;
-struct some_data *other_data;
-bool toggle;
+static struct some_data *user_controlled;
+static struct some_data *other_data;
+static bool toggle;
 
 // under/overflow
 static u8 unsigned_counter = 250;
@@ -267,7 +269,7 @@ static ssize_t slab_write(struct file *fps, const char __user *buf, size_t len,
 }
 
 // TODO: make this double freeable
-void slab_operate_with_other_data(void)
+static void slab_operate_with_other_data(void)
 {
 	if (!toggle) {
 		toggle = true;
@@ -369,25 +371,25 @@ static ssize_t race_write(struct file *fps, const char __user *buf, size_t len,
 	return n;
 }
 
-static ssize_t df_alloc(struct file *fps, char *buf, size_t len, loff_t *offset)
+static ssize_t df_alloc(struct file *fps, char __user *buf, size_t len, loff_t *offset)
 {
 	double_free = kmalloc(len, GFP_KERNEL);
 	return len;
 }
-static ssize_t df_free(struct file *fps, const char *buf, size_t len, loff_t *offset)
+static ssize_t df_free(struct file *fps, const char __user *buf, size_t len, loff_t *offset)
 {
 	// FAULT: double free
 	kfree(double_free);
 	return len;
 }
 
-static ssize_t use_after_free_read(struct file *fps, char *buf, size_t len, loff_t *offset)
+static ssize_t use_after_free_read(struct file *fps, char __user *buf, size_t len, loff_t *offset)
 {
 	char *tmp = kmalloc(len, GFP_KERNEL);
 	strncpy(tmp, buffer, len);
 	// FAULT: use after free
 	kfree(tmp);
-	strncpy(buf, tmp, len);
+	copy_to_user(buf, tmp, len);
 	return len;
 }
 
