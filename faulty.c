@@ -30,6 +30,7 @@ static ssize_t race_write(struct file *fps, const char __user *buf, size_t len, 
 static ssize_t df_alloc(struct file *fps, char __user *buf, size_t len, loff_t *offset);
 static ssize_t df_free(struct file *fps, const char __user *buf, size_t len, loff_t *offset);
 static ssize_t use_after_free_read(struct file *fps, char __user *buf, size_t len, loff_t *offset);
+static ssize_t infoleak_read(struct file *fps, char __user *buf, size_t len, loff_t *offset);
 static void non_reachable_function(void);
 
 // stack buffer overflow
@@ -113,6 +114,18 @@ static const struct file_operations fops_use_after_free = {
 	.read = use_after_free_read,
 };
 
+static const struct file_operations fops_infoleak = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.read = infoleak_read,
+};
+
+// FAULT: infoleak
+#define DATA_LEN 4096
+struct a_struct {
+	char data[DATA_LEN];
+} *uninitialized;
+
 static int __init mod_init(void)
 {
 	pr_debug("Faulty: creating debugfs-endpoints\n");
@@ -168,6 +181,14 @@ static int __init mod_init(void)
 	if (!init_endpoint(dir, "use-after-free", &fops_use_after_free))
 		pr_debug("Faulty: Double free bug at debugfs '%s/use-after-free'\n", root);
 
+	uninitialized = kmalloc(sizeof (struct a_struct), GFP_KERNEL);
+	if (!uninitialized) {
+		pr_debug("Faulty: Infoleak - cannot allocate buffer\n");
+		goto end;
+	}
+
+	if (!init_endpoint(dir, "infoleak", &fops_infoleak))
+		pr_debug("Faulty: Infoleak at debugfs '%s/infoleak'\n", root);
 
 end:
 	pr_debug("Faulty: module loaded\n");
@@ -180,6 +201,7 @@ static void __exit mod_exit(void)
 	debugfs_remove_recursive(dir);
 	kfree(race1);
 	kfree(race2);
+	kfree(uninitialized);
 
 	pr_debug("Faulty: Unloaded faulty kernel module\n");
 }
@@ -393,6 +415,15 @@ static ssize_t use_after_free_read(struct file *fps, char __user *buf, size_t le
 	return len;
 }
 
+
+static ssize_t infoleak_read(struct file *fps, char __user *buf, size_t len, loff_t *offset)
+{
+
+	ssize_t l = len < DATA_LEN ? len : DATA_LEN;
+	return simple_read_from_buffer(buf, len, offset, uninitialized->data,
+				       l);
+
+}
 
 static void non_reachable_function(void)
 {
