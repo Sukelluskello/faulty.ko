@@ -1,6 +1,5 @@
 ifneq ($(KERNELRELEASE),)
 obj-m += faulty.o
-faulty-y := faulty_main.o
 
 ccflags-y := -DDEBUG -Wall
 
