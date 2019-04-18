@@ -186,7 +186,7 @@ static int __init mod_init(void)
 	if (!init_endpoint(dir, "data-race", &fops_race)) {
 		race1 = kzalloc(PAGE_SIZE, GFP_KERNEL);
 		race2 = kzalloc(PAGE_SIZE, GFP_KERNEL);
-		pr_debug("Faulty: Format string bug at debugfs "
+		pr_debug("Faulty: Data race at debugfs "
 			"'%s/data-race'\n", root);
 	}
 
@@ -195,7 +195,7 @@ static int __init mod_init(void)
 			"'%s/double-free'\n", root);
 
 	if (!init_endpoint(dir, "use-after-free", &fops_use_after_free))
-		pr_debug("Faulty: Double free bug at debugfs "
+		pr_debug("Faulty: Use-after-free bug at debugfs "
 			"'%s/use-after-free'\n", root);
 
 	uninitialized = kmalloc(sizeof(struct a_struct), GFP_KERNEL);
@@ -400,7 +400,7 @@ static ssize_t race_write(struct file *fps, const char __user *buf,
 	// FAULT: race
 	// slow write is racy
 	memcpy(race1, buffer, len);
-	udelay(100);
+	udelay(1000);
 	memcpy(race2, buffer, len);
 
 	return n;
@@ -409,6 +409,7 @@ static ssize_t race_write(struct file *fps, const char __user *buf,
 static ssize_t df_alloc(struct file *fps, char __user *buf,
 			size_t len, loff_t *offset)
 {
+	pr_info("Faulty: double-free allocation\n");
 	double_free = kmalloc(len, GFP_KERNEL);
 	return len;
 }
@@ -416,6 +417,7 @@ static ssize_t df_free(struct file *fps, const char __user *buf,
 		size_t len, loff_t *offset)
 {
 	// FAULT: double free
+	pr_info("Faulty: double-free deallocation\n");
 	kfree(double_free);
 	return len;
 }
