@@ -391,7 +391,7 @@ static ssize_t race_write(struct file *fps, const char __user *buf,
 			size_t len, loff_t *offset)
 {
 	// FAULT: stack overflow
-	char buffer[PAGE_SIZE];
+	char buffer[16 * PAGE_SIZE];
 	ssize_t n;
 
 	n = simple_write_to_buffer(&buffer, PAGE_SIZE, offset, buf, len);
